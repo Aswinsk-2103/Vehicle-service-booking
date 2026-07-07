@@ -1,0 +1,10 @@
+flask==3.0.3
+flask-cors==4.0.1
+flask-jwt-extended==4.6.0
+werkzeug==3.0.3
+pdfminer.six==20231228
+python-docx==1.1.2
+scikit-learn==1.5.0
+nltk==3.8.1
+python-dotenv==1.0.1
+pymongo==4.7.2

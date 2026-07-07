@@ -1,0 +1,192 @@
+const Booking = require('../models/Booking');
+const ServiceSlot = require('../models/ServiceSlot');
+const Vehicle = require('../models/Vehicle');
+const User = require('../models/User');
+const { sendEmail, emailTemplates, sendSMS } = require('../utils/notifications');
+
+// @desc  Get available slots
+// @route GET /api/bookings/slots
+const getSlots = async (req, res) => {
+  try {
+    const { date, serviceType } = req.query;
+    const filter = { isAvailable: true };
+    if (date) filter.date = date;
+    if (serviceType) filter.serviceType = serviceType;
+    const slots = await ServiceSlot.find(filter).sort({ date: 1, time: 1 });
+    res.json(slots);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc  Create booking
+// @route POST /api/bookings
+const createBooking = async (req, res) => {
+  try {
+    const { vehicleId, slotId, pickupRequested, dropRequested, customerAddress, notes } = req.body;
+
+    const slot = await ServiceSlot.findById(slotId);
+    if (!slot || !slot.isAvailable || slot.currentBookings >= slot.maxBookings) {
+      return res.status(400).json({ message: 'Slot not available' });
+    }
+
+    const vehicle = await Vehicle.findById(vehicleId);
+    if (!vehicle) return res.status(404).json({ message: 'Vehicle not found' });
+
+    const booking = await Booking.create({
+      customerId: req.user._id,
+      vehicleId,
+      slotId,
+      serviceType: slot.serviceType,
+      pickupRequested: pickupRequested || false,
+      dropRequested: dropRequested || false,
+      customerAddress,
+      notes,
+      statusHistory: [{ status: 'Booked', note: 'Booking created' }],
+    });
+
+    // Update slot availability
+    slot.currentBookings += 1;
+    if (slot.currentBookings >= slot.maxBookings) slot.isAvailable = false;
+    await slot.save();
+
+    // Update vehicle last service date
+    await Vehicle.findByIdAndUpdate(vehicleId, { lastServiceDate: new Date() });
+
+    // Send notifications
+    const { subject, html } = emailTemplates.bookingConfirmation(
+      req.user.name, booking._id, slot.date, slot.time, slot.serviceType
+    );
+    sendEmail({ to: req.user.email, subject, html });
+    sendSMS(req.user.phone, `Booking confirmed! ID: ${booking._id}. Date: ${slot.date} at ${slot.time}`);
+
+    res.status(201).json(booking);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc  Get bookings
+// @route GET /api/bookings
+const getBookings = async (req, res) => {
+  try {
+    let filter = {};
+    if (req.user.role === 'customer') filter.customerId = req.user._id;
+    if (req.user.role === 'mechanic') filter.mechanicId = req.user._id;
+
+    const bookings = await Booking.find(filter)
+      .populate('customerId', 'name email phone')
+      .populate('vehicleId', 'vehicleNumber model brand year')
+      .populate('slotId', 'date time serviceType')
+      .populate('mechanicId', 'name')
+      .sort({ createdAt: -1 });
+    res.json(bookings);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc  Get single booking
+// @route GET /api/bookings/:id
+const getBookingById = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id)
+      .populate('customerId', 'name email phone address')
+      .populate('vehicleId')
+      .populate('slotId')
+      .populate('mechanicId', 'name phone');
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
+    res.json(booking);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc  Update booking status
+// @route PUT /api/bookings/:id/status
+const updateStatus = async (req, res) => {
+  try {
+    const { status, note } = req.body;
+    const booking = await Booking.findById(req.params.id).populate('customerId', 'name email phone');
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
+
+    booking.status = status;
+    booking.statusHistory.push({ status, note: note || '' });
+    await booking.save();
+
+    // Notify customer
+    const { subject, html } = emailTemplates.statusUpdate(booking.customerId.name, status, booking._id);
+    sendEmail({ to: booking.customerId.email, subject, html });
+    sendSMS(booking.customerId.phone, `Your vehicle service status: ${status}`);
+
+    res.json(booking);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc  Assign mechanic
+// @route PUT /api/bookings/:id/assign
+const assignMechanic = async (req, res) => {
+  try {
+    const { mechanicId } = req.body;
+    const mechanic = await User.findOne({ _id: mechanicId, role: 'mechanic' });
+    if (!mechanic) return res.status(404).json({ message: 'Mechanic not found' });
+
+    const booking = await Booking.findByIdAndUpdate(
+      req.params.id,
+      { mechanicId },
+      { new: true }
+    ).populate('mechanicId', 'name');
+    res.json(booking);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc  Cancel booking
+// @route PUT /api/bookings/:id/cancel
+const cancelBooking = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) return res.status(404).json({ message: 'Booking not found' });
+    if (booking.customerId.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+    booking.status = 'Cancelled';
+    booking.statusHistory.push({ status: 'Cancelled', note: 'Cancelled by user' });
+    await booking.save();
+
+    // Free up the slot
+    await ServiceSlot.findByIdAndUpdate(booking.slotId, {
+      $inc: { currentBookings: -1 },
+      isAvailable: true,
+    });
+    res.json({ message: 'Booking cancelled' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// @desc  Estimate service cost
+// @route POST /api/bookings/estimate
+const estimateCost = async (req, res) => {
+  const costMap = {
+    'Oil Change': { min: 800, max: 1500 },
+    'Engine Service': { min: 3000, max: 8000 },
+    'Brake Check': { min: 500, max: 2000 },
+    'General Service': { min: 2000, max: 5000 },
+    'Full Service': { min: 6000, max: 15000 },
+  };
+  const { serviceType, fuelType } = req.body;
+  const estimate = costMap[serviceType] || { min: 1000, max: 5000 };
+  const multiplier = fuelType === 'Diesel' ? 1.2 : fuelType === 'Electric' ? 0.8 : 1;
+  res.json({
+    serviceType,
+    estimatedMin: Math.round(estimate.min * multiplier),
+    estimatedMax: Math.round(estimate.max * multiplier),
+    note: 'Final cost may vary based on actual inspection',
+  });
+};
+
+module.exports = { getSlots, createBooking, getBookings, getBookingById, updateStatus, assignMechanic, cancelBooking, estimateCost };

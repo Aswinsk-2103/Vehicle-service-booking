@@ -1,1 +1,3 @@
-# Vehicle-service-booking
+node_modules/
+server/.env
+.env

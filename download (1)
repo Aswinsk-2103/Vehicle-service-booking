@@ -1,0 +1,99 @@
+# 🔧 AutoService Pro - Vehicle Service Booking System
+
+A full-stack MERN application for automobile service centers.
+
+## Tech Stack
+- **Frontend**: React.js, Tailwind CSS, Axios, React Router, Recharts
+- **Backend**: Node.js, Express.js, JWT Authentication
+- **Database**: MongoDB, Mongoose
+- **Notifications**: Nodemailer (Email), Mock SMS
+
+## Prerequisites
+- Node.js v16+
+- MongoDB (local or Atlas)
+
+## Setup Instructions
+
+### 1. Clone and Install
+
+```bash
+# Install server dependencies
+cd server
+npm install
+
+# Install client dependencies
+cd ../client
+npm install
+```
+
+### 2. Configure Environment
+
+Edit `server/.env`:
+```
+PORT=5000
+MONGO_URI=mongodb://localhost:27017/vehicle_service_db
+JWT_SECRET=your_super_secret_key
+EMAIL_USER=your_gmail@gmail.com
+EMAIL_PASS=your_gmail_app_password
+CLIENT_URL=http://localhost:3000
+```
+
+### 3. Seed Demo Data
+
+```bash
+cd server
+npm run seed
+```
+
+### 4. Start the Application
+
+```bash
+# Terminal 1 - Start backend
+cd server
+npm start
+
+# Terminal 2 - Start frontend
+cd client
+npm start
+```
+
+App runs at: http://localhost:3000
+
+## Demo Credentials
+
+| Role     | Email                  | Password     |
+|----------|------------------------|--------------|
+| Admin    | admin@demo.com         | admin123     |
+| Customer | customer@demo.com      | customer123  |
+| Mechanic | mechanic@demo.com      | mechanic123  |
+
+## API Endpoints
+
+| Method | Endpoint                        | Description           | Auth     |
+|--------|---------------------------------|-----------------------|----------|
+| POST   | /api/auth/register              | Register user         | Public   |
+| POST   | /api/auth/login                 | Login                 | Public   |
+| GET    | /api/vehicles                   | Get vehicles          | Customer |
+| POST   | /api/vehicles                   | Add vehicle           | Customer |
+| GET    | /api/bookings/slots             | Get available slots   | Auth     |
+| POST   | /api/bookings                   | Create booking        | Customer |
+| PUT    | /api/bookings/:id/status        | Update status         | Admin/Mechanic |
+| POST   | /api/invoices                   | Create invoice        | Admin    |
+| GET    | /api/admin/dashboard            | Dashboard stats       | Admin    |
+| GET    | /api/admin/queue                | Garage queue          | Admin    |
+
+## Features
+
+- ✅ JWT Authentication with role-based access (Customer/Admin/Mechanic)
+- ✅ Vehicle management with smart service recommendations
+- ✅ Calendar-based slot booking with double-booking prevention
+- ✅ Real-time repair status tracking with timeline
+- ✅ Invoice generation with GST calculation and PDF print
+- ✅ Email notifications (Nodemailer) + SMS simulation
+- ✅ Admin dashboard with charts (Recharts)
+- ✅ Mechanic assignment and task management
+- ✅ Spare parts inventory with low-stock alerts
+- ✅ Garage queue monitoring
+- ✅ Pickup & drop service requests
+- ✅ Service cost estimator
+- ✅ Responsive design with Tailwind CSS

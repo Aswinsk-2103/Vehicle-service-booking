@@ -1,0 +1,65 @@
+const nodemailer = require('nodemailer');
+
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+});
+
+const sendEmail = async ({ to, subject, html }) => {
+  try {
+    await transporter.sendMail({ from: `"Vehicle Service Center" <${process.env.EMAIL_USER}>`, to, subject, html });
+    console.log(`Email sent to ${to}`);
+  } catch (err) {
+    console.error('Email send failed:', err.message);
+  }
+};
+
+const emailTemplates = {
+  bookingConfirmation: (name, bookingId, date, time, serviceType) => ({
+    subject: 'Booking Confirmed - Vehicle Service Center',
+    html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;border:1px solid #e0e0e0;border-radius:8px">
+      <h2 style="color:#1a56db">Booking Confirmed!</h2>
+      <p>Dear <strong>${name}</strong>,</p>
+      <p>Your service booking has been confirmed.</p>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0">
+        <tr><td style="padding:8px;background:#f3f4f6"><strong>Booking ID</strong></td><td style="padding:8px">${bookingId}</td></tr>
+        <tr><td style="padding:8px;background:#f3f4f6"><strong>Date</strong></td><td style="padding:8px">${date}</td></tr>
+        <tr><td style="padding:8px;background:#f3f4f6"><strong>Time</strong></td><td style="padding:8px">${time}</td></tr>
+        <tr><td style="padding:8px;background:#f3f4f6"><strong>Service</strong></td><td style="padding:8px">${serviceType}</td></tr>
+      </table>
+      <p>Please arrive 10 minutes before your scheduled time.</p>
+      <p style="color:#6b7280;font-size:12px">Vehicle Service Center | support@vehicleservice.com</p>
+    </div>`,
+  }),
+
+  statusUpdate: (name, status, bookingId) => ({
+    subject: `Service Update: ${status}`,
+    html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;border:1px solid #e0e0e0;border-radius:8px">
+      <h2 style="color:#1a56db">Service Status Update</h2>
+      <p>Dear <strong>${name}</strong>,</p>
+      <p>Your vehicle service status has been updated to: <strong style="color:#059669">${status}</strong></p>
+      <p>Booking ID: <strong>${bookingId}</strong></p>
+      <p style="color:#6b7280;font-size:12px">Vehicle Service Center</p>
+    </div>`,
+  }),
+
+  invoiceGenerated: (name, invoiceNumber, total) => ({
+    subject: 'Invoice Generated - Vehicle Service Center',
+    html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:20px;border:1px solid #e0e0e0;border-radius:8px">
+      <h2 style="color:#1a56db">Invoice Ready</h2>
+      <p>Dear <strong>${name}</strong>,</p>
+      <p>Your invoice <strong>${invoiceNumber}</strong> has been generated.</p>
+      <p>Total Amount: <strong style="color:#dc2626">₹${total}</strong></p>
+      <p>Please login to download your invoice.</p>
+      <p style="color:#6b7280;font-size:12px">Vehicle Service Center</p>
+    </div>`,
+  }),
+};
+
+// Mock SMS simulation
+const sendSMS = (phone, message) => {
+  console.log(`[SMS SIMULATION] To: ${phone} | Message: ${message}`);
+  return { success: true, message: 'SMS simulated' };
+};
+
+module.exports = { sendEmail, emailTemplates, sendSMS };

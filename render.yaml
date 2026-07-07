@@ -1,0 +1,120 @@
+import React, { useEffect, useState } from 'react';
+import { getAllSlots, createSlot, deleteSlot } from '../../services/api';
+import toast from 'react-hot-toast';
+import Loader from '../../components/Loader';
+
+const SERVICE_TYPES = ['Oil Change', 'Engine Service', 'Brake Check', 'General Service', 'Full Service'];
+const TIME_SLOTS = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+
+const ManageSlots = () => {
+  const [slots, setSlots] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ date: '', time: '09:00', serviceType: 'General Service', maxBookings: 1 });
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchSlots = () => getAllSlots().then(r => setSlots(r.data)).finally(() => setLoading(false));
+  useEffect(() => { fetchSlots(); }, []);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await createSlot(form);
+      toast.success('Slot created!');
+      fetchSlots();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create slot');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this slot?')) return;
+    try {
+      await deleteSlot(id);
+      toast.success('Slot deleted');
+      fetchSlots();
+    } catch {
+      toast.error('Failed to delete slot');
+    }
+  };
+
+  if (loading) return <Loader />;
+
+  return (
+    <div className="max-w-5xl mx-auto px-4 py-8">
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Manage Service Slots</h1>
+
+      <div className="card mb-6">
+        <h2 className="text-lg font-semibold mb-4">Create New Slot</h2>
+        <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+            <input type="date" className="input-field" required min={new Date().toISOString().split('T')[0]}
+              value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+            <select className="input-field" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })}>
+              {TIME_SLOTS.map(t => <option key={t}>{t}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Service Type</label>
+            <select className="input-field" value={form.serviceType} onChange={(e) => setForm({ ...form, serviceType: e.target.value })}>
+              {SERVICE_TYPES.map(s => <option key={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Max Bookings</label>
+            <input type="number" className="input-field" min={1} max={10}
+              value={form.maxBookings} onChange={(e) => setForm({ ...form, maxBookings: parseInt(e.target.value) })} />
+          </div>
+          <div className="sm:col-span-2 lg:col-span-4">
+            <button type="submit" disabled={submitting} className="btn-primary">{submitting ? 'Creating...' : '+ Create Slot'}</button>
+          </div>
+        </form>
+      </div>
+
+      <div className="card">
+        <h2 className="text-lg font-semibold mb-4">All Slots ({slots.length})</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-left">
+                <th className="p-3 font-medium">Date</th>
+                <th className="p-3 font-medium">Time</th>
+                <th className="p-3 font-medium">Service Type</th>
+                <th className="p-3 font-medium">Bookings</th>
+                <th className="p-3 font-medium">Status</th>
+                <th className="p-3 font-medium">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {slots.map(s => (
+                <tr key={s._id} className="border-t hover:bg-gray-50">
+                  <td className="p-3">{s.date}</td>
+                  <td className="p-3">{s.time}</td>
+                  <td className="p-3">{s.serviceType}</td>
+                  <td className="p-3">{s.currentBookings}/{s.maxBookings}</td>
+                  <td className="p-3">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.isAvailable ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {s.isAvailable ? 'Available' : 'Full'}
+                    </span>
+                  </td>
+                  <td className="p-3">
+                    <button onClick={() => handleDelete(s._id)} className="text-red-600 hover:underline text-xs">Delete</button>
+                  </td>
+                </tr>
+              ))}
+              {slots.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-gray-400">No slots created yet</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ManageSlots;

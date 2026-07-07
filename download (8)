@@ -1,0 +1,26 @@
+const mongoose = require('mongoose');
+
+const bookingSchema = new mongoose.Schema({
+  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  vehicleId: { type: mongoose.Schema.Types.ObjectId, ref: 'Vehicle', required: true },
+  slotId: { type: mongoose.Schema.Types.ObjectId, ref: 'ServiceSlot', required: true },
+  mechanicId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  serviceType: { type: String, required: true },
+  status: {
+    type: String,
+    enum: ['Booked', 'Vehicle Received', 'Inspection', 'Repair in Progress', 'Testing', 'Completed', 'Ready for Delivery', 'Cancelled'],
+    default: 'Booked',
+  },
+  statusHistory: [{
+    status: String,
+    updatedAt: { type: Date, default: Date.now },
+    note: String,
+  }],
+  pickupRequested: { type: Boolean, default: false },
+  dropRequested: { type: Boolean, default: false },
+  customerAddress: { type: String },
+  estimatedCost: { type: Number },
+  notes: { type: String },
+}, { timestamps: true });
+
+module.exports = mongoose.model('Booking', bookingSchema);
